@@ -1,0 +1,23 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion externalCompileSdkVersion
+    buildToolsVersion externalBuildToolsVersion
+
+    defaultConfig {
+        minSdkVersion externalMinSdkVersion
+        targetSdkVersion externalTargetSdkVersion
+    }
+    lintOptions {
+        warning 'InvalidPackage'
+    }
+}
+
+dependencies {
+    api 'com.liulishuo.filedownloader:library:1.4.1'
+    api externalOKHTTP
+    api group: 'org.apache.ant', name: 'ant', version: '1.7.1'
+    api (project(':AliyunVideoSdk')) {
+        transitive = false
+    }
+}
