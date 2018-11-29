@@ -1,4 +1,4 @@
-include ':app'
+include ':app', ':chunk'
 include ':AliyunVideoSdk'
 include ':AlivcCore'
 include ':AliyunSVideoBase'
