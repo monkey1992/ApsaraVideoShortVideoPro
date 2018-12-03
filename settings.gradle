@@ -8,3 +8,5 @@ include ':AliyunEditor:editor_demo'
 include ':AliyunRecorder:record_demo'
 include ':AliyunCrop:crop_demo'
 include ':AliyunImport:import_demo'
+
+include ':ChunkRecorder:record_demo'

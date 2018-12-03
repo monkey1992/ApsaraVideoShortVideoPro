@@ -70,7 +70,7 @@ android {
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile project(':AliyunEditor:editor_demo')
-    compile project(':AliyunRecorder:record_demo')
+    compile project(':ChunkRecorder:record_demo')
     compile project(':AliyunImport:import_demo')
     implementation externalAndroidAppCompatV7
     implementation externalAndroidSupportV4
