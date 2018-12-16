@@ -393,6 +393,9 @@ public class Common {
                 return false;
             }
         });
+        if (files == null) {
+            return;
+        }
         length = files.length;
         if(length == 0 && !isViewDestroy()) {
             mView.get().setVisibility(View.GONE);

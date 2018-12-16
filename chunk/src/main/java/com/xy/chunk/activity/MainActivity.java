@@ -1,10 +1,12 @@
 package com.xy.chunk.activity;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -12,6 +14,7 @@ import android.support.v4.view.ViewPager;
 import android.support.v4.view.ViewPager.OnPageChangeListener;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,13 +23,25 @@ import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
+import com.aliyun.common.utils.StorageUtils;
+import com.aliyun.common.utils.ToastUtil;
+import com.aliyun.demo.recorder.activity.AlivcSvideoRecordActivity;
+import com.aliyun.demo.recorder.util.Common;
 import com.aliyun.svideo.base.utils.FastClickUtil;
+import com.aliyun.svideo.sdk.external.struct.common.VideoDisplayMode;
+import com.aliyun.svideo.sdk.external.struct.common.VideoQuality;
+import com.aliyun.svideo.sdk.external.struct.encoder.VideoCodecs;
+import com.aliyun.svideo.sdk.external.struct.recorder.CameraType;
+import com.aliyun.svideo.sdk.external.struct.recorder.FlashType;
+import com.aliyun.svideo.sdk.external.struct.snap.AliyunSnapVideoParam;
 import com.xy.chunk.R;
 import com.xy.chunk.adapter.HomeViewPagerAdapter;
 import com.xy.chunk.adapter.MultilayerGridAdapter;
 import com.xy.chunk.model.ScenesModel;
 import com.xy.chunk.utils.PermissionUtils;
 
+import java.io.File;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,14 +82,20 @@ public class MainActivity extends AppCompatActivity {
     /**
      * module数据，
      */
+//    private int[] modules = new int[]{
+//            R.string.solution_recorder, R.string.solution_crop,
+//            R.string.solution_edit
+//    };
     private int[] modules = new int[]{
-            R.string.solution_recorder, R.string.solution_crop,
-            R.string.solution_edit
+            R.string.solution_recorder
     };
+    //    private int[] homeicon = {
+//            R.mipmap.icon_home_svideo, R.mipmap.icon_home_edit,
+//            R.mipmap.icon_home_svideo
+//
+//    };
     private int[] homeicon = {
-            R.mipmap.icon_home_svideo, R.mipmap.icon_home_edit,
             R.mipmap.icon_home_svideo
-
     };
     /**
      * 权限申请
@@ -88,6 +109,12 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 1000;
 
+    private String[] mEffDirs;
+    private AsyncTask<Void, Void, Void> copyAssetsTask;
+    private AsyncTask<Void, Void, Void> initAssetPath;
+
+    private boolean recordEnable = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -95,11 +122,96 @@ public class MainActivity extends AppCompatActivity {
         boolean checkResult = PermissionUtils.checkPermissionsGroup(this, permission);
         if (!checkResult) {
             PermissionUtils.requestPermissions(this, permission, PERMISSION_REQUEST_CODE);
+        } else {
+            initAssetPath();
+            copyAssets();
         }
         iniViews();
         setDatas();
 
         buildHomeItem();
+    }
+
+    private void initAssetPath() {
+        initAssetPath = new AssetPathInitTask(this).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    }
+
+    public static class AssetPathInitTask extends AsyncTask<Void, Void, Void> {
+
+        private final WeakReference<MainActivity> weakReference;
+
+        AssetPathInitTask(MainActivity activity) {
+            weakReference = new WeakReference<>(activity);
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            MainActivity activity = weakReference.get();
+            if (activity != null) {
+                activity.setAssetPath();
+            }
+            return null;
+        }
+    }
+
+    private void setAssetPath() {
+        String path = StorageUtils.getCacheDirectory(this).getAbsolutePath() + File.separator + Common.QU_NAME
+                + File.separator;
+        File filter = new File(new File(path), "filter");
+        String[] list = filter.list();
+        if (list == null || list.length == 0) {
+            return;
+        }
+        mEffDirs = new String[list.length + 1];
+        mEffDirs[0] = null;
+        int length = list.length;
+        for (int i = 0; i < length; i++) {
+            mEffDirs[i + 1] = filter.getPath() + File.separator + list[i];
+        }
+    }
+
+    private void copyAssets() {
+        recordEnable = false;
+        copyAssetsTask = new CopyAssetsTask(this).executeOnExecutor(
+                AsyncTask.THREAD_POOL_EXECUTOR);
+    }
+
+    public static class CopyAssetsTask extends AsyncTask<Void, Void, Void> {
+
+        private WeakReference<MainActivity> weakReference;
+        ProgressDialog progressBar;
+
+        CopyAssetsTask(MainActivity activity) {
+            Log.d("test", "CopyAssetsTask");
+            weakReference = new WeakReference<>(activity);
+            progressBar = new ProgressDialog(activity);
+            progressBar.setMessage("资源拷贝中....");
+            progressBar.setCanceledOnTouchOutside(false);
+            progressBar.setCancelable(false);
+            progressBar.setProgressStyle(android.app.ProgressDialog.STYLE_SPINNER);
+            progressBar.show();
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            MainActivity activity = weakReference.get();
+            if (activity != null) {
+                Common.copyAll(activity);
+                Log.d("test", "doInBackground");
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+            MainActivity activity = weakReference.get();
+            if (activity != null) {
+                activity.recordEnable = true;
+            }
+            progressBar.dismiss();
+            Log.d("test", "onPostExecute");
+        }
     }
 
     /**
@@ -132,6 +244,8 @@ public class MainActivity extends AppCompatActivity {
             if (isAllGranted) {
                 // 如果所有的权限都授予了
                 //Toast.makeText(this, "get All Permisison", Toast.LENGTH_SHORT).show();
+                initAssetPath();
+                copyAssets();
             } else {
                 // 弹出对话框告诉用户需要权限的原因, 并引导用户去应用权限管理中手动打开权限按钮
                 showPermissionDialog();
@@ -202,18 +316,49 @@ public class MainActivity extends AppCompatActivity {
                     if (FastClickUtil.isFastClick()) {
                         return;
                     }
+
+                    if (!recordEnable) {
+                        ToastUtil.showToast(MainActivity.this, "资源拷贝中...");
+                        return;
+                    }
+
                     switch (position) {
                         case 0:
-
                             // 视频拍摄
-                            Intent record = new Intent();
-                            //判断是编辑模块进入还是通过社区模块的编辑功能进入
-                            //svideo: 短视频
-                            //community: 社区
-                            record.setClassName(MainActivity.this, "com.aliyun.demo.recorder.activity.AlivcParamSettingActivity");
-                            record.putExtra(INTENT_PARAM_KEY_ENTRANCE, INTENT_PARAM_KEY_VALUE);
-                            startActivity(record);
+                            AliyunSnapVideoParam recordParam = new AliyunSnapVideoParam.Builder()
+                                    .setResolutionMode(AliyunSnapVideoParam.RESOLUTION_540P)
+                                    .setRatioMode(AliyunSnapVideoParam.RATIO_MODE_9_16)
+                                    .setRecordMode(AliyunSnapVideoParam.RECORD_MODE_AUTO)
+                                    .setFilterList(mEffDirs)
+                                    .setBeautyLevel(80)
+                                    .setBeautyStatus(true)
+                                    .setCameraType(CameraType.FRONT)
+                                    .setFlashType(FlashType.ON)
+                                    .setNeedClip(true)
+                                    .setMaxDuration(15000)
+                                    .setMinDuration(2000)
+                                    .setVideoQuality(VideoQuality.HD)
+                                    .setGop(5)
+                                    .setVideoBitrate(2000)
+                                    .setVideoCodec(VideoCodecs.H264_HARDWARE)
+                                    /**
+                                     * 裁剪参数
+                                     */
+                                    .setMinVideoDuration(4000)
+                                    .setMaxVideoDuration(29 * 1000)
+                                    .setMinCropDuration(3000)
+                                    .setFrameRate(25)
+                                    .setCropMode(VideoDisplayMode.SCALE)
+                                    .build();
+                            AlivcSvideoRecordActivity.startRecord(MainActivity.this, recordParam, INTENT_PARAM_KEY_VALUE);
 
+//                            Intent record = new Intent();
+//                            //判断是编辑模块进入还是通过社区模块的编辑功能进入
+//                            //svideo: 短视频
+//                            //community: 社区
+//                            record.setClassName(MainActivity.this, "com.aliyun.demo.recorder.activity.AlivcParamSettingActivity");
+//                            record.putExtra(INTENT_PARAM_KEY_ENTRANCE, INTENT_PARAM_KEY_VALUE);
+//                            startActivity(record);
                             break;
                         case 1:
                             // 视频裁剪
@@ -300,4 +445,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (copyAssetsTask != null) {
+            copyAssetsTask.cancel(true);
+            copyAssetsTask = null;
+        }
+
+        if (initAssetPath != null) {
+            initAssetPath.cancel(true);
+            initAssetPath = null;
+        }
+    }
 }
